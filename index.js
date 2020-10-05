@@ -3,10 +3,10 @@
 var app = require('./server.js')();
 const { resolve } = require('path');
 const got = require('got');
+var moment = require('moment');
 
 const cache = {};
 var city_keys = new Set();
-var ONE_HOUR = 60 * 60 * 1000;
 
 var my_cities = {
     "New York City" : { "state" : "New York", "country" : "USA"},
@@ -56,8 +56,9 @@ app.post('/query', function(req, res) {
     let details = req.body;
     if (req.headers['x-secret'] !== process.env.CUMULIO_SECRET)
       return res.status(403).end('Given plugin secret does not match Cumul.io plugin secret.');
-    
-    if(cache[details.id] !== undefined && (Date.now() - cache[details.id].last_update) < 24*ONE_HOUR) {
+    var curTime = moment();
+    if(cache[details.id] !== undefined && (curTime.diff(cache[details.id].last_update, 'hours') < 24)) {
+        console.log("RETURNING CAHCE");
         return res.status(200).json(cache[details.id].values);
     }
     else 
@@ -80,7 +81,7 @@ app.post('/query', function(req, res) {
                         city_keys.add(city_key);
                         cache[details.id].values.push(city_data);
                     }
-                    cache[details.id].last_update = Date.now();
+                    cache[details.id].last_update = moment();
                 }
             }
             return res.status(200).json(cache[details.id].values);  
