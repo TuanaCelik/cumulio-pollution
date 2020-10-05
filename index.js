@@ -2,7 +2,6 @@
 
 var app = require('./server.js')();
 const { resolve } = require('path');
-var request = require('request');
 const got = require('got');
 
 const cache = {};
@@ -49,7 +48,7 @@ async function getAirQuality(city) {
         return Promise.resolve(city_data);
     }
     catch(error) {
-        Promise.reject(error);
+        console.log(error.response.body);
     }
 };
 
