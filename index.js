@@ -3,6 +3,7 @@
 var app = require('./server.js')();
 const { resolve } = require('path');
 var request = require('request');
+const got = require('got');
 
 const cache = {};
 var city_keys = new Set();
@@ -36,25 +37,20 @@ app.get('/datasets', function(req, res) {
     return res.status(200).json(datasets);
 });
 
-function getAirQuality(city) {
+async function getAirQuality(city) {
     let state = my_cities[city]["state"];
     let country = my_cities[city]["country"];
-    return new Promise(
-        (resolve, reject) => {
-        request.get({
-            uri: `http://api.airvisual.com/v2/city?city=${city}&state=${state}&country=${country}&key=${process.env.API_KEY}`,
-            gzip: true,
-            json: true
-        }, function(error, airData) {
-            if (error)
-                return reject(error);
-            let city_data;
-            if(typeof airData.body.data.current !== 'undefined') {
-                city_data = [city, airData.body.data.current.pollution.ts, airData.body.data.location.coordinates[1], airData.body.data.location.coordinates[0], airData.body.data.current.pollution.aqius, airData.body.data.current.pollution.aqicn];
-            }
-            setTimeout(function() {resolve(city_data);}, 1500);
-        });
-    });
+    try {
+        let response = await got(`http://api.airvisual.com/v2/city?city=${city}&state=${state}&country=${country}&key=${process.env.API_KEY}`).json();
+        let city_data;
+        if(typeof response.data.current !== 'undefined') {
+            city_data = [city, response.data.current.pollution.ts, response.data.location.coordinates[1], response.data.location.coordinates[0], response.data.current.pollution.aqius, response.data.current.pollution.aqicn];
+        }
+        return Promise.resolve(city_data);
+    }
+    catch(error) {
+        Promise.reject(error);
+    }
 };
 
 app.post('/query', function(req, res) {
@@ -62,7 +58,7 @@ app.post('/query', function(req, res) {
     if (req.headers['x-secret'] !== process.env.CUMULIO_SECRET)
       return res.status(403).end('Given plugin secret does not match Cumul.io plugin secret.');
     
-    if(cache[details.id] && (Date.now() - cache[details.id].last_update) < 24*ONE_HOUR) {
+    if(cache[details.id] !== undefined && (Date.now() - cache[details.id].last_update) < 24*ONE_HOUR) {
         return res.status(200).json(cache[details.id].values);
     }
     else 
