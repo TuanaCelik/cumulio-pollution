@@ -36,7 +36,7 @@ app.get('/datasets', function(req, res) {
     return res.status(200).json(datasets);
 });
 
-let getAirQuality = (city, res) => {
+function getAirQuality(city) {
     let state = my_cities[city]["state"];
     let country = my_cities[city]["country"];
     return new Promise(
@@ -48,12 +48,9 @@ let getAirQuality = (city, res) => {
         }, function(error, airData) {
             if (error)
                 return reject(error);
-            //console.log(country + " " + state + " " + city);
-            console.log(airData.body.data);
             let city_data;
             if(typeof airData.body.data.current !== 'undefined') {
                 city_data = [city, airData.body.data.current.pollution.ts, airData.body.data.location.coordinates[1], airData.body.data.location.coordinates[0], airData.body.data.current.pollution.aqius, airData.body.data.current.pollution.aqicn];
-                //tracked_cities.push(city_data);
             }
             setTimeout(function() {resolve(city_data);}, 1500);
         });
@@ -66,12 +63,10 @@ app.post('/query', function(req, res) {
       return res.status(403).end('Given plugin secret does not match Cumul.io plugin secret.');
     
     if(cache[details.id] && (Date.now() - cache[details.id].last_update) < 24*ONE_HOUR) {
-        console.log("RETURNING CACHE");
         return res.status(200).json(cache[details.id].values);
     }
     else 
     {
-        console.log("UPDATING");
         if(!cache[details.id])
         {
             cache[details.id] = {
@@ -83,7 +78,7 @@ app.post('/query', function(req, res) {
             if (error)
                 return res.status(500).end('Internal Server Error');
             for(var key of Object.keys(my_cities)){
-                let city_data = await getAirQuality(key, res);
+                let city_data = await getAirQuality(key);
                 if(city_data && city_data.length > 0){
                     let city_key = city_data[0] + city_data[1];
                     if(!city_keys.has(city_key)) {
@@ -97,16 +92,4 @@ app.post('/query', function(req, res) {
         };
         get_data();
     }
-    // let tracked_cities = [];
-    // async function get_data(error) {
-    //     if (error)
-    //         return res.status(500).end('Internal Server Error');
-    //     for(var key of Object.keys(my_cities)){
-    //         let city_data = await getAirQuality(key, res);
-    //         if(city_data && city_data.length > 0) tracked_cities.push(city_data);
-    //     }
-    //     console.log("TRACKED: "  + tracked_cities);
-    //     return res.status(200).json(tracked_cities);
-    // };
-    // get_data();    
   });
