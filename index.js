@@ -4,6 +4,7 @@ var app = require('./server.js')();
 const { resolve } = require('path');
 const got = require('got');
 var moment = require('moment');
+const { default: create } = require('got/dist/source/create');
 
 const cache = {};
 var city_keys = new Set();
@@ -37,55 +38,55 @@ app.get('/datasets', function(req, res) {
 });
 
 async function getAirQuality(city) {
-    let state = my_cities[city]["state"];
-    let country = my_cities[city]["country"];
+    let state = my_cities[city].state;
+    let country = my_cities[city].country;
     try {
         let response = await got(`http://api.airvisual.com/v2/city?city=${city}&state=${state}&country=${country}&key=${process.env.API_KEY}`).json();
-        let city_data;
-        if(typeof response.data.current !== 'undefined') {
-            city_data = [city, response.data.current.pollution.ts, response.data.location.coordinates[1], response.data.location.coordinates[0], response.data.current.pollution.aqius, response.data.current.pollution.aqicn];
-        }
-        return Promise.resolve(city_data);
+        if(response !== undefined && response !== null && response.data !== undefined && response.data !== null && response.data.current !== undefined && response.data.current !== null)
+            return [city, response.data.current.pollution.ts, response.data.location.coordinates[1], response.data.location.coordinates[0], response.data.current.pollution.aqius, response.data.current.pollution.aqicn];
     }
     catch(error) {
         console.log(error.response.body);
     }
 };
 
-app.post('/query', function(req, res) {
+function isCacheStale(id) {
+    var curTime = moment();
+    return curTime.diff(cache[id].last_update, 'hours') >= 24;
+}
+
+function createCache(id) {
+    if(!cache[id])
+    {
+        cache[id] = {
+            values : [],
+            last_update : null
+        }
+    }
+}
+
+app.post('/query', async function(req, res) {
     let details = req.body;
     if (req.headers['x-secret'] !== process.env.CUMULIO_SECRET)
       return res.status(403).end('Given plugin secret does not match Cumul.io plugin secret.');
-    var curTime = moment();
-    if(cache[details.id] !== undefined && (curTime.diff(cache[details.id].last_update, 'hours') < 24)) {
-        console.log("RETURNING CAHCE");
+    
+    if(cache[details.id] !== undefined && !isCacheStale(details.id)) {
         return res.status(200).json(cache[details.id].values);
     }
-    else 
-    {
-        if(!cache[details.id])
-        {
-            cache[details.id] = {
-                values : [],
-                last_update : null
+    else {
+        createCache(details.id);   
+        for(var key of Object.keys(my_cities)){
+            let city_data = await getAirQuality(key);
+            if(city_data !== undefined && city_data.length > 0){
+                let city_key = city_data[0] + city_data[1];
+                if(!city_keys.has(city_key)) {
+                    city_keys.add(city_key);
+                    cache[details.id].values.push(city_data);
+                }
+                cache[details.id].last_update = moment();
             }
         }
-        async function get_data(error) {
-            if (error)
-                return res.status(500).end('Internal Server Error');
-            for(var key of Object.keys(my_cities)){
-                let city_data = await getAirQuality(key);
-                if(city_data && city_data.length > 0){
-                    let city_key = city_data[0] + city_data[1];
-                    if(!city_keys.has(city_key)) {
-                        city_keys.add(city_key);
-                        cache[details.id].values.push(city_data);
-                    }
-                    cache[details.id].last_update = moment();
-                }
-            }
-            return res.status(200).json(cache[details.id].values);  
-        };
-        get_data();
+        return res.status(200).json(cache[details.id].values);  
     }
+
   });
