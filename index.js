@@ -66,11 +66,9 @@ app.post('/query', async function(req, res) {
       return res.status(403).end('Given plugin secret does not match Cumul.io plugin secret.');
     
     if(cache[details.id] !== undefined && !isCacheStale(details.id)) {
-        console.log("RETURNING CACHE")
         return res.status(200).json(cache[details.id].values);
     }
     else {
-        console.log("UPDATING");
         createCache(details.id);  
         for(const key in my_cities){
             try {
@@ -82,7 +80,7 @@ app.post('/query', async function(req, res) {
                 }
                 cache[details.id].last_update = moment();
             } catch(error) {
-                console.error(error);
+                console.error("Reached request limit, will serve from cache");
             }
         }
         return res.status(200).json(cache[details.id].values);
