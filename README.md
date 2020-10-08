@@ -1,7 +1,7 @@
 # cumulio-pollution
 Cumul.io plugin for Air Quality Data
 
-This repository accompanies the [link to tutorial].
+This repository accompanies the tutorial to [create a basic plugin from an open API](https://blog.cumul.io/2020/10/07/create-a-cumul-io-api-plugin-with-air-visuals-data/).
 I use the [AirVisal API](https://www.iqair.com/air-pollution-data-api) (Comunity Version) to create a Cumul.io plugin
 
 To run:
